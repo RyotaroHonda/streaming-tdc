@@ -3,6 +3,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.ALL;
 
 library mylib;
+use mylib.defDataBusAbst.all;
 use mylib.defDelimiter.all;
 use mylib.defLaccp.all;
 --use mylib.defODPBlock.all;
@@ -14,7 +15,7 @@ entity DelimiterGenerator is
     enDEBUG       : boolean := false
   );
   port(
-    rst               : in std_logic;
+    syncReset         : in std_logic;
     clk               : in std_logic;
 
     -- Status input ----------------------------------
@@ -34,7 +35,6 @@ end DelimiterGenerator;
 
 architecture RTL of DelimiterGenerator is
   -- System --
-  signal sync_reset     : std_logic;
 
   -- Signal decralation ---------------------------------------------
   -- Heartbeat delimiter --
@@ -59,45 +59,45 @@ begin
   dOutDelimiter       <= hb_delimiter;
 
   -- Generate heartbeat delimiter
-  u_delimiter_gen : process(sync_reset,clk)
+  u_delimiter_gen : process(syncReset, clk)
   begin
-    if(sync_reset = '1') then
-      hb_delimiter_wren       <= '0';
-    elsif(clk'event and clk = '1') then
-      -- Generate two delimiter words, 1st at kMaxHBCount-1, 2nd at KmaxHBCount --
-      if(unsigned(hbCount) >= unsigned(kMaxHBCount)-1)then
-        hb_delimiter_wren                     <= '1';
-        hb_delimiter(kPosHbdDataType'range)   <= kDatatypeHeartbeat;
-        hb_delimiter(kPosHbdReserve1'range)   <= (others => '0');
-        hb_delimiter(kPosHbdFlag'range)       <= reg_flags;
-        hb_delimiter(kPosHbdOffset'range)     <= std_logic_vector(LaccpFineOffset);
-        hb_delimiter(kPosHbdHBFrame'range)    <= hbfNumber;
+    if(clk'event and clk = '1') then
+      if(syncReset = '1') then
+        hb_delimiter_wren       <= '0';
       else
-        hb_delimiter_wren                     <= '0';
+        -- Generate two delimiter words, 1st at kMaxHBCount-1, 2nd at KmaxHBCount --
+        if(unsigned(hbCount) >= unsigned(kMaxHBCount)-1)then
+          hb_delimiter_wren                     <= '1';
+          hb_delimiter(kPosHbdDataType'range)   <= kDatatypeHeartbeat;
+          hb_delimiter(kPosHbdReserve1'range)   <= (others => '0');
+          hb_delimiter(kPosHbdFlag'range)       <= reg_flags;
+          hb_delimiter(kPosHbdOffset'range)     <= std_logic_vector(LaccpFineOffset);
+          hb_delimiter(kPosHbdHBFrame'range)    <= hbfNumber;
+        else
+          hb_delimiter_wren                     <= '0';
+        end if;
       end if;
     end if;
   end process;
 
   -- Flag record --
-  u_flag_recoard : process(sync_reset, clk)
+  u_flag_recoard : process(syncReset, clk)
   begin
-    if(sync_reset = '1') then
-      reg_flags  <= (others => '0');
-    elsif(clk'event and clk = '1') then
-      edge_wren <= edge_wren(0) & hb_delimiter_wren;
+    if(clk'event and clk = '1') then
+      if(syncReset = '1') then
+        reg_flags  <= (others => '0');
+      else
+        edge_wren <= edge_wren(0) & hb_delimiter_wren;
 
-      for i in 0 to kWidthDelimiterFlag-1 loop
-        if(flagsIn(i) = '1') then
-          reg_flags(i)  <= '1';
-        elsif(edge_wren = "10") then
-          reg_flags(i)  <= '0';
-        end if;
-      end loop;
+        for i in 0 to kWidthDelimiterFlag-1 loop
+          if(flagsIn(i) = '1') then
+            reg_flags(i)  <= '1';
+          elsif(edge_wren = "10") then
+            reg_flags(i)  <= '0';
+          end if;
+        end loop;
+      end if;
     end if;
   end process;
-
-  -- Reset sequence --
-  u_reset_gen_sys   : entity mylib.ResetGen
-    port map(rst, clk, sync_reset);
 
 end RTL;

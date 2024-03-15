@@ -3,14 +3,11 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 library mylib;
 use mylib.defHeartBeatUnit.all;
+use mylib.defDataBusAbst.all;
 
 package defDelimiter is
-
-  -- WIDTH of DATA
-  constant kWidthData         : integer  := 64;    -- width of the data
-
   -- Data type -----------------------------------------------------------------------------
-  constant kWidthDataType     : integer  := 6;
+  constant kWidthDataType             : integer  := 6;
   constant kDatatypeTDCData           : std_logic_vector (kWidthDataType-1 downto 0) := "001011"; -- TDC leading ata
   constant kDatatypeTDCDataT          : std_logic_vector (kWidthDataType-1 downto 0) := "001101"; -- TDC trailing ata
   constant kDataTypeIThrottleT1Start  : std_logic_vector (kWidthDataType-1 downto 0) := "011001"; -- Input Throttling Type2 Start timing
@@ -70,6 +67,7 @@ package defDelimiter is
   constant kPosHbdTransSize : std_logic_vector(kPosHbdGenSize'low-1  downto kPosHbdGenSize'low  -20):= (others => '0');
 
   function checkDelimiter(data_type : std_logic_vector) return boolean;
+  function checkTdc(data_type : std_logic_vector) return boolean;
 
   -- Data array definition ------------------------------------------------------------------
   --type dFineCountType is array (integer range kNumStrInput-1 downto 0) of std_logic_vector(kWidthFineCount-1 downto 0);
@@ -97,5 +95,14 @@ package body defDelimiter is
       return false;
     end if;
   end checkDelimiter;
+
+  function checkTdc(data_type : std_logic_vector) return boolean is
+  begin
+    if(data_type = kDatatypeTDCData or data_type = kDatatypeTDCDataT) then
+      return true;
+    else
+      return false;
+    end if;
+  end checkTdc;
 
 end package body defDelimiter;

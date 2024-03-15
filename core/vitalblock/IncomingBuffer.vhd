@@ -3,49 +3,48 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 library mylib;
-use mylib.defChannel.all;
+--use mylib.defChannel.all;
 use mylib.defDelimiter.all;
+use mylib.defDataBusAbst.all;
 
 entity IncomingBuffer is
   generic (
-    -- DEBUG --
-    enDEBUG : boolean := false
+    kNumStrInput    : integer := 32;
+    enDEBUG         : boolean := false
   );
   port (
-    clk     : in  STD_LOGIC;  -- base clock
-    rst     : in  STD_LOGIC;  -- base reset
+    clk               : in  STD_LOGIC;
+    syncReset         : in  STD_LOGIC;  -- synchronous reset
 
     -- input  (ODP block)
-    ODPWriteEnableIn    : in  STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); -- TDC data write enable
-    ODPDinIn            : in  dDataType;                                  -- TDC data data in
+    odpWrenIn         : in  STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); -- Write enable from ODP
+    odpDataIn         : in  DataArrayType(kNumStrInput-1 downto 0);
 
     -- flag   (system)
-    bufferProgFull      : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --incomming FIFO prog full
+    bufferProgFull    : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --incomming FIFO prog full
 
     -- output (merger unit)
-    outputReadEnableIn  : in  STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --input fifo read enable
-    outputDoutOut       : out dDataType;                                  --input fifo data out
-    outputEmptyOut      : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --input fifo empty flag
-    outputAlmostEmptyOut: out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --input fifo almost empty flag
-    outputValidOut      : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0)  --input fifo valid flag
+    bufRdenIn         : in  STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --fifo read enable
+    bufDataOut        : out DataArrayType(kNumStrInput-1 downto 0);
+    bufEmptyOut       : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --fifo empty flag
+    bufAlmostEmptyOut : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0); --fifo almost empty flag
+    bufValidOut       : out STD_LOGIC_VECTOR (kNumStrInput-1 downto 0)  --fifo valid flag
   );
 end IncomingBuffer;
 
 architecture Behavioral of IncomingBuffer is
 
   -- Flag --
-  signal flag_1st_delimiter : std_logic_vector(kNumStrInput-1 downto 0);  -- indicate that waitting for the 2nd delimiter
-  signal flag_data_lost     : std_logic_vector(kNumStrInput-1 downto 0);  -- indicate that the TDC data is lost in this delimiter frame
   signal is_delimiter       : std_logic_vector(kNumStrInput-1 downto 0);  -- indicate that the TDC data is lost in this delimiter frame
 
   -- Incoming FIFO --
   signal wren_fifo         : std_logic_vector(kNumStrInput-1 downto 0);
-  signal din_fifo          : dDataType;
+  signal din_fifo          : DataArrayType(kNumStrInput-1 downto 0);
   signal full_fifo         : std_logic_vector(kNumStrInput-1 downto 0);
   signal almost_full_fifo  : std_logic_vector(kNumStrInput-1 downto 0);
   signal wr_ack_fifo       : std_logic_vector(kNumStrInput-1 downto 0);
 
-  constant kNumBitDepthIncomingFifo : positive  := 6;
+  constant kNumBitDepthIncomingFifo : integer  := 6;
   type dDateCountIncomingFifoType is array ( integer range kNumStrInput-1 downto 0) of std_logic_vector(kNumBitDepthIncomingFifo-1 downto 0); -- for count the data count of incoming FIFO
   signal data_count_fifo   : dDateCountIncomingFifoType;
   signal prog_full_fifo    : std_logic_vector(kNumStrInput-1 downto 0);
@@ -71,16 +70,6 @@ architecture Behavioral of IncomingBuffer is
     );
     end component;
 
-  -- function check_delimiter --
-  function check_delimiter( dInDataType : std_logic_vector  ) return boolean is
-  begin
-    if(dInDataType=kDatatypeHeartbeat)then   -- heartbeat
-        return true;
-    else
-        return false;
-    end if;
-  end check_delimiter;
-
   attribute mark_debug : boolean;
   --attribute mark_debug of flag_1st_delimiter   : signal is enDEBUG;
   --attribute mark_debug of flag_data_lost       : signal is enDEBUG;
@@ -100,54 +89,27 @@ begin
   for_process :for i in kNumStrInput-1 downto 0 generate
   begin
 
-    -- 1st/2nd delimiter
-    delimiter_1st_process : process(rst,clk)
-    begin
-      if(rst = '1') then
-        flag_1st_delimiter(i)  <= '0';
-      elsif(clk'event and clk = '1') then
-        if(check_delimiter(ODPDinIn(i)(kPosHbdDataType'range))) then  -- delimiter word
-          if(flag_1st_delimiter(i) = '1')then  -- 2nd delimiter
-            flag_1st_delimiter(i)  <='0';
-          else                          -- 1st delimiter
-            flag_1st_delimiter(i)  <='1';
-          end if;
-        end if;
-      end if;
-    end process;
-
     -- outputfifo
-    outputfifo_process : process(rst,clk)
+    outputfifo_process : process(syncReset,clk)
     begin
-      if(rst = '1') then
-        flag_data_lost(i) <= '0';
-        wren_fifo(i) <= '0';
-        din_fifo(i)  <= (others=>'0');
-      elsif(clk'event and clk = '1') then
-        if(ODPWriteEnableIn(i) = '1') then -- There are data from the ODP block
-          if(check_delimiter(ODPDinIn(i)(kMSBDataType downto kLSBDataType)))then -- delimiter word
-            is_delimiter(i) <= '1';
-
-            if(flag_1st_delimiter(i) = '1') then  -- deassert lost flag when 2nd delimiter
-              flag_data_lost(i) <= '0';
-            end if;
-            wren_fifo(i) <= '1';
-            din_fifo(i)  <= ODPDinIn(i);
-            if(unsigned(flag_data_lost) /= 0) then             -- insert lost flag
-              din_fifo(i)(kIndexDataLost + kLSBFlag)  <= '1';
-            end if;
-          elsif(prog_full_fifo(i) /= '0') then  -- incoming FIFO is almost full
-            flag_data_lost(i) <= '1';               -- assert lost flag
-            wren_fifo(i)      <= '0';
-            din_fifo(i)       <= (others=>'0');
-          else                          -- TDC data
-            wren_fifo(i) <= '1';
-            din_fifo(i)  <= ODPDinIn(i);
-          end if;
-        else
-          is_delimiter(i) <= '0';                        -- no data
+      if(clk'event and clk = '1') then
+        if(syncReset = '1') then
           wren_fifo(i) <= '0';
-          din_fifo(i)  <= (others=>'0');
+        else
+          if(odpWrenIn(i) = '1') then -- There are data from the ODP block
+            din_fifo(i)  <= odpDataIn(i);
+            if(checkTdc(odpDataIn(i)(kPosHbdDataType'range)) = false)then -- delimiter word
+              is_delimiter(i) <= '1';
+              wren_fifo(i)    <= '1';
+            elsif(prog_full_fifo(i) /= '0') then  -- incoming FIFO is almost full
+              wren_fifo(i)    <= '0';
+            else                          -- TDC data
+              wren_fifo(i)    <= '1';
+            end if;
+          else
+            is_delimiter(i)   <= '0';                        -- no data
+            wren_fifo(i)      <= '0';
+          end if;
         end if;
       end if;
     end process;
@@ -155,18 +117,18 @@ begin
     -- incoming FIFO
     u_incomingFifo: incomingFifo port map(
       clk         => clk,
-      srst        => rst,
+      srst        => syncReset,
 
       wr_en       => wren_fifo(i),
       din         => din_fifo(i),
       full        => full_fifo(i),
       almost_full => almost_full_fifo(i),
 
-      rd_en       => outputReadEnableIn(i),
-      dout        => outputDoutOut(i),
-      empty       => outputEmptyOut(i),
-      almost_empty=> outputAlmostEmptyOut(i),
-      valid       => outputValidOut(i),
+      rd_en       => bufRdenIn(i),
+      dout        => bufDataOut(i),
+      empty       => bufEmptyOut(i),
+      almost_empty=> bufAlmostEmptyOut (i),
+      valid       => bufValidOut(i),
 
       data_count  => data_count_fifo(i),
       prog_full   => prog_full_fifo(i)
