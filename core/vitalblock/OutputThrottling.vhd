@@ -3,15 +3,16 @@ use IEEE.STD_LOGIC_1164.ALL;
 use ieee.numeric_std.all;
 
 library mylib;
-use mylib.defDataStructure.all;
+use mylib.defDataBusAbst.all;
+use mylib.defDelimiter.all;
 
 entity OutputThrottling is
   generic (
     enDEBUG : boolean := false
   );
   port(
-    rst     : in STD_LOGIC; --user reset (asynchronous)
-    clk     : in STD_LOGIC; --base cloc
+    syncReset           : in STD_LOGIC; --user reset (synchronous)
+    clk                 : in STD_LOGIC; --base cloc
 
     -- status input --
     intputThrottlingOn  : in std_logic; -- Signal indicating InputThrottlingType2 is active
@@ -38,6 +39,7 @@ architecture Behavioral of OutputThrottling is
 
   signal data_type                : std_logic_vector(kWidthDataType-1 downto 0);
   signal throttling_is_working    : std_logic;
+  signal mem_throttling           : std_logic;
 
   signal is_delimiter             : std_logic;
 
@@ -51,19 +53,21 @@ begin
   --                              Body
   -- =======================================================================
 
-  data_type   <= dIn(kMSBDataType downto kLSBDataType);
+  data_type   <= dIn(kPosHbdDataType'range);
   isWorking   <= throttling_is_working;
 
   -- Throttle status -------------------------------------------------------
-  u_state : process(rst, clk)
+  u_state : process(syncReset, clk)
   begin
-    if(rst = '1') then
-      throttling_is_working <= '0';
-    elsif(clk'event and clk = '1') then
-      if(intputThrottlingOn = '1' and pfullLinkIn = '1') then
-        throttling_is_working  <= '1';
-      elsif(emptyLinkIn = '1') then
-        throttling_is_working  <= '0';
+    if(clk'event and clk = '1') then
+      if(syncReset = '1') then
+        throttling_is_working <= '0';
+      else
+        if(intputThrottlingOn = '1' and pfullLinkIn = '1') then
+          throttling_is_working  <= '1';
+        elsif(emptyLinkIn = '1') then
+          throttling_is_working  <= '0';
+        end if;
       end if;
     end if;
   end process;
@@ -83,11 +87,11 @@ begin
           dOut      <= dIn;
           if(checkDelimiter(data_type) = true) then
             -- Delimiter data --
-            validOut                            <= '1';
-            dOut(kMSBFlag downto kLSBFlag)      <= dIn(kMSBFlag downto kLSBFlag) or genFlagVector(kIndexOutThrottling, '1') or genFlagVector(kIndexDataLost, '1');
+            validOut                <= '1';
+            dOut(kPosHbdFlag'range) <= dIn(kPosHbdFlag'range) or genFlagVector(kIndexOutThrottling, mem_throttling);
           else
             -- TDC data --
-            validOut                            <= '0';
+            validOut                <= '0';
           end if;
         else
           dOut      <= dIn;
@@ -95,6 +99,25 @@ begin
         end if;
       else
         validOut    <= '0';
+      end if;
+    end if;
+  end process;
+
+  u_mem : process(clk, syncReset)
+  begin
+    if(clk'event and clk = '1') then
+      if(syncReset = '1') then
+        mem_throttling  <= '0';
+      else
+        if(validIn = '1' and checkDelimiter(data_type) = true) then -- Delimiter is comming --
+          if(throttling_is_working = '0') then
+            mem_throttling  <= '0';
+          end if;
+        else
+          if(throttling_is_working = '1') then
+            mem_throttling  <= '1';
+          end if;
+        end if;
       end if;
     end if;
   end process;

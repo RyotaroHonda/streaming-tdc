@@ -22,18 +22,18 @@ entity MergerUnit is
     hbfNumMismatch      : out std_logic;  -- Heartbeat frame number mismatch among input channel.
 
     -- Merger input --
-    inputReadEnableOut  : out STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo read enable
-    inputDoutIn         : in  DataArrayType(kNumInput-1 downto 0);     --input fifo data out
-    inputEmptyIn        : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo empty flag
-    inputAlmostEmptyIn  : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo almost empty flag
-    inputValidIn        : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo valid flag
+    rdenOut             : out STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo read enable
+    dataIn              : in  DataArrayType(kNumInput-1 downto 0);     --input fifo data out
+    emptyIn             : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo empty flag
+    almostEmptyIn       : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo almost empty flag
+    validIn             : in  STD_LOGIC_VECTOR (kNumInput-1 downto 0); --input fifo valid flag
 
     -- Merger output --
-    outputReadEnableIn  : in  STD_LOGIC;                                --output fifo read enable
-    outputDoutOut       : out STD_LOGIC_VECTOR (kWidthData-1 downto 0); --output fifo data out
-    outputEmptyOut      : out STD_LOGIC;                                --output fifo empty flag
-    outputAlmostEmptyOut: out STD_LOGIC;                                --output fifo almost empty flag
-    outputValidOut      : out STD_LOGIC                                 --output fifo valid flag
+    rdenIn              : in  STD_LOGIC;                                --output fifo read enable
+    dataOut             : out STD_LOGIC_VECTOR (kWidthData-1 downto 0); --output fifo data out
+    emptyOut            : out STD_LOGIC;                                --output fifo empty flag
+    almostEmptyOut      : out STD_LOGIC;                                --output fifo almost empty flag
+    validOut            : out STD_LOGIC                                 --output fifo valid flag
   );
 end MergerUnit;
 
@@ -211,13 +211,13 @@ begin
         if((prog_full_outputfifo='0') and reg_full='1')then                                     -- end of full mode
           needread  := needread_full;
         elsif((checkDelimiter(din_merger(kPosHbdDataType'range)) and (is_read_inputfifo and mask_delimiter) = kZero and flag_last1stdelimiter=false) or flag_wait2nddelimiter=rden_inputfifo)then  -- read the first delimiter or read the 2nd delimiter word when full mode
-          needread  := get_needread(remainder,not inputEmptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
+          needread  := get_needread(remainder,not emptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
 
-        elsif((inputAlmostEmptyIn and rden_inputfifo) /= kZero)then                                 --read input fifo is almost empty
-          needread  := get_needread(remainder,not inputEmptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
+        elsif((almostEmptyIn and rden_inputfifo) /= kZero)then                                 --read input fifo is almost empty
+          needread  := get_needread(remainder,not emptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
 
         elsif(rden = kZero)then                                                                     --rden_inputfifo is empty (idle, not rden run)
-          needread  := get_needread(remainder,not inputEmptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
+          needread  := get_needread(remainder,not emptyIn,rden_inputfifo,is_read_inputfifo,mask_delimiter,din_merger,flag_wait2nddelimiter,flag_last1stdelimiter);
 
         else
           needread  := needread;
@@ -239,18 +239,18 @@ begin
         rden_inputfifo  <= rden;
         reg_full        <= prog_full_outputfifo;
         -- debug
-        debug_valid     <= not inputEmptyIn;
+        debug_valid     <= not emptyIn;
         debug_needread  <= needread;
         debug_remainder <= remainder;
       end if;
     end if;
   end process;
 
-  inputReadEnableOut  <= rden_inputfifo;
-  is_read_inputfifo   <= inputValidIn;
+  rdenOut  <= rden_inputfifo;
+  is_read_inputfifo   <= validIn;
 
   for_switch_input_to_output : for i in kNumInput-1 downto 0 generate
-    din_merger  <= inputDoutIn(i) when (is_read_inputfifo(i)='1') else (others=>'Z');
+    din_merger  <= dataIn(i) when (is_read_inputfifo(i)='1') else (others=>'Z');
   end generate for_switch_input_to_output;
 
   --mask
@@ -355,11 +355,11 @@ begin
       full        => full_outputfifo,
       almost_full => almost_empty_outputfifo,
 
-      rd_en       => outputReadEnableIn,
-      dout        => outputDoutOut,
-      empty       => outputEmptyOut,
-      almost_empty=> outputAlmostEmptyOut,
-      valid       => outputValidOut,
+      rd_en       => rdenIn,
+      dout        => dataOut,
+      empty       => emptyOut,
+      almost_empty=> almostEmptyOut,
+      valid       => validOut,
 
       prog_full   => prog_full_outputfifo
     );
@@ -377,11 +377,11 @@ begin
       full        => full_outputfifo,
       almost_full => almost_empty_outputfifo,
 
-      rd_en       => outputReadEnableIn,
-      dout        => outputDoutOut,
-      empty       => outputEmptyOut,
-      almost_empty=> outputAlmostEmptyOut,
-      valid       => outputValidOut,
+      rd_en       => rdenIn,
+      dout        => dataOut,
+      empty       => emptyOut,
+      almost_empty=> almostEmptyOut,
+      valid       => validOut,
 
       prog_full   => prog_full_outputfifo
     );

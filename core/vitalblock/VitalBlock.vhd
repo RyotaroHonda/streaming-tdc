@@ -3,24 +3,24 @@ use IEEE.STD_LOGIC_1164.ALL;
 use ieee.numeric_std.all;
 
 library mylib;
-use mylib.defChannel.all;
-use mylib.defDataStructure.all;
+use mylib.defDelimiter.all;
+use mylib.defDataBusAbst.all;
+use mylib.defHeartBeatUnit.all;
 
 entity VitalBlock is
   generic (
-    -- Type definition
-    kTdcType : string := "LRTDC"; -- "LRTDC" or "HRTDC"
-    -- DEBUG --
-    enDEBUG : boolean := false
+    kTdcType            : string := "LRTDC"; -- "LRTDC" or "HRTDC"
+    kNumInput           : integer:= 32;
+    enDEBUG             : boolean := false
   );
   port (
-    rst                 : in STD_LOGIC;  -- User reset (asynchronous)
-    clk                 : in STD_LOGIC;  -- Base clock
+    syncReset           : in STD_LOGIC;  -- User reset (synchronous)
+    clk                 : in STD_LOGIC;
     lhbfNumMismatch     : out std_logic; -- Local heartbeat frame num mismatch
 
     -- ODPBlock input --
-    ODPWriteEnableIn    : in  std_logic_vector(kNumStrInput-1 downto 0); -- TDC data write enable
-    ODPDinIn            : in  dDataType;                                  -- TDC data data in
+    odpWrenIn           : in  std_logic_vector(kNumInput-1 downto 0); -- TDC data write enable
+    odpDataIn           : in  DataArrayType(kNumInput-1 downto 0);
     hbCount             : in  std_logic_vector(kWidthHBCount-1 downto 0);
 
     -- Stcp flag --
@@ -35,38 +35,37 @@ entity VitalBlock is
     emptyLinkInBufIn    : in std_logic;
 
     -- output --
-    outputReadEnableIn  : in  STD_LOGIC;                                  --output fifo read enable
-    outputDoutOut       : out STD_LOGIC_VECTOR (kWidthData-1 downto 0);   --output fifo data out
-    outputEmptyOut      : out STD_LOGIC;
-    outputAlmostEmptyOut: out STD_LOGIC;
-    outputValidOut      : out STD_LOGIC                                   --output fifo valid flag
+    rdenIn              : in  STD_LOGIC;                                  --output fifo read enable
+    dataOut             : out STD_LOGIC_VECTOR (kWidthData-1 downto 0);   --output fifo data out
+    emptyOut            : out STD_LOGIC;
+    almostEmptyOut      : out STD_LOGIC;
+    validOut            : out STD_LOGIC                                   --output fifo valid flag
   );
 end VitalBlock;
 
 architecture Behavioral of VitalBlock is
 
   -- System --
-  signal sync_reset             : std_logic;
-  signal incoming_buf_pfull     : std_logic_vector(kNumStrInput-1 downto 0);
+  signal incoming_buf_pfull     : std_logic_vector(kNumInput-1 downto 0);
   signal input_throttling_type2_on : std_logic;
   signal output_throttling_on   : std_logic;
   signal local_hbf_num_mismatch : std_logic;
 
   -- Input Throttling Type2 --
-  signal valid_ithrottling      : std_logic_vector(kNumStrInput-1 downto 0);
-  signal dout_ithrottling       : dDataType;
-  signal inthrottling_is_working : std_logic_vector(kNumStrInput-1 downto 0);
+  signal valid_ithrottling      : std_logic_vector(kNumInput-1 downto 0);
+  signal dout_ithrottling       : DataArrayType(kNumInput-1 downto 0);
+  signal inthrottling_is_working : std_logic_vector(kNumInput-1 downto 0);
 
-  signal t2start_insert_request, t2start_insert_ack   : std_logic_vector(kNumStrInput-1 downto 0);
-  signal t2end_insert_request, t2end_insert_ack   : std_logic_vector(kNumStrInput-1 downto 0);
+  signal t2start_insert_request, t2start_insert_ack   : std_logic_vector(kNumInput-1 downto 0);
+  signal t2end_insert_request, t2end_insert_ack   : std_logic_vector(kNumInput-1 downto 0);
 
 
   -- incoming unit -> merger unit
-  signal rden_incoming          : std_logic_vector(kNumStrInput-1 downto 0);
-  signal dout_incoming          : dDataType;
-  signal empty_incoming         : std_logic_vector(kNumStrInput-1 downto 0);
-  signal almost_empty_incoming  : std_logic_vector(kNumStrInput-1 downto 0);
-  signal valid_incoming         : std_logic_vector(kNumStrInput-1 downto 0);
+  signal rden_incoming          : std_logic_vector(kNumInput-1 downto 0);
+  signal dout_incoming          : DataArrayType(kNumInput-1 downto 0);
+  signal empty_incoming         : std_logic_vector(kNumInput-1 downto 0);
+  signal almost_empty_incoming  : std_logic_vector(kNumInput-1 downto 0);
+  signal valid_incoming         : std_logic_vector(kNumInput-1 downto 0);
 
   -- Merger to OutputThrottling
   signal dout_merger_out        : STD_LOGIC_VECTOR (kWidthData-1 downto 0);   --output fifo data out
@@ -96,7 +95,7 @@ begin
 
 
   -- Input Throttling Type2 --
-  gen_ithrottle_t2 : for i in 0 to kNumStrInput-1 generate
+  gen_ithrottle_t2 : for i in 0 to kNumInput-1 generate
   begin
     u_ITT2 : entity mylib.InputThrottlingType2
       generic map(
@@ -104,8 +103,8 @@ begin
         enDEBUG   => false
       )
       port map(
-        rst     => sync_reset,
-        clk     => clk,
+        syncReset           => syncReset,
+        clk                 => clk,
 
         -- status input --
         ibufProgFullIn      => incoming_buf_pfull(i),
@@ -122,8 +121,8 @@ begin
         t2endAck            => t2end_insert_ack(i),
 
         -- Data In --
-        validIn             => ODPWriteEnableIn(i),
-        dIn                 => ODPDinIn(i),
+        validIn             => odpWrenIn(i),
+        dIn                 => odpDataIn(i),
 
         -- Data Out --
         validOut            => valid_ithrottling(i),
@@ -136,22 +135,23 @@ begin
   -- IncomingBuffer --
   u_incoming_buffer: entity mylib.IncomingBuffer
     generic map(
-      enDEBUG => false
+      kNumStrInput  => kNumInput,
+      enDEBUG       => false
     )
     port map(
-      clk     => clk,
-      rst     => sync_reset,
+      clk             => clk,
+      syncReset       => syncReset,
 
-      ODPWriteEnableIn    => ODPWriteEnableIn,
-      ODPDinIn            => ODPDinIn,
+      odpWrenIn       => odpWrenIn,
+      odpDataIn       => odpDataIn,
 
-      bufferProgFull      => incoming_buf_pfull,
+      bufferProgFull  => incoming_buf_pfull,
 
-      outputReadEnableIn  => rden_incoming,
-      outputDoutOut       => dout_incoming,
-      outputEmptyOut      => empty_incoming,
-      outputAlmostEmptyOut=> almost_empty_incoming,
-      outputValidOut      => valid_incoming
+      bufRdenIn          => rden_incoming,
+      bufDataOut         => dout_incoming,
+      bufEmptyOut        => empty_incoming,
+      bufAlmostEmptyOut  => almost_empty_incoming,
+      bufValidOut        => valid_incoming
 
     );
 
@@ -160,57 +160,59 @@ begin
   begin
 
     output_throttling_on  <= '0';
-    outputValidOut          <= valid_merger_out;
-    outputDoutOut           <= dout_merger_out;
+    validOut              <= valid_merger_out;
+    dataOut               <= dout_merger_out;
 
 
     u_merger_block: entity mylib.MergerMznBlock
       generic map(
-        enDEBUG => false
+        kNumInput     => kNumInput,
+        enDEBUG       => false
       )
       port map(
-        clk    => clk,
-        rst    => sync_reset,
+        clk           => clk,
+        syncReset     => syncReset,
 
-        inputReadEnableOut  => rden_incoming,
-        inputDoutIn         => dout_incoming,
-        inputEmptyIn        => empty_incoming,
-        inputAlmostEmptyIn  => almost_empty_incoming,
-        inputValidIn        => valid_incoming,
+        rdenOut       => rden_incoming,
+        dataIn        => dout_incoming,
+        emptyIn       => empty_incoming,
+        almostEmptyIn => almost_empty_incoming,
+        validIn       => valid_incoming,
 
-        outputReadEnableIn  => outputReadEnableIn,
-        outputDoutOut       => dout_merger_out,
-        outputEmptyOut      => outputEmptyOut,
-        outputAlmostEmptyOut=> outputAlmostEmptyOut,
-        outputValidOut      => valid_merger_out
+        rdenIn        => rdenIn,
+        dataOut       => dout_merger_out,
+        emptyOut      => emptyOut,
+        almostEmptyOut => almostEmptyOut,
+        validOut      => valid_merger_out
       );
   end generate;
 
   gen_lrtdc : if kTdcType = "LRTDC" generate
   begin
 
-    read_enable_to_merger   <= '1' when(output_throttling_on = '1') else outputReadEnableIn;
+    read_enable_to_merger   <= '1' when(output_throttling_on = '1') else rdenIn;
 
     u_merger_block: entity mylib.MergerBlock
       generic map(
-        enDEBUG => false
+        kNumInput => kNumInput,
+        enDEBUG   => false
       )
       port map(
-        clk                 => clk,
-        rst                 => sync_reset,
-        hbfNumMismatch      => local_hbf_num_mismatch,
+        clk             => clk,
+        syncReset       => syncReset,
+        hbfNumMismatch  => local_hbf_num_mismatch,
 
-        inputReadEnableOut  => rden_incoming,
-        inputDoutIn         => dout_incoming,
-        inputEmptyIn        => empty_incoming,
-        inputAlmostEmptyIn  => almost_empty_incoming,
-        inputValidIn        => valid_incoming,
+        rdenOut         => rden_incoming,
+        dataIn          => dout_incoming,
+        emptyIn         => empty_incoming,
+        almostEmptyIn   => almost_empty_incoming,
+        validIn         => valid_incoming,
 
-        outputReadEnableIn  => read_enable_to_merger,
-        outputDoutOut       => dout_merger_out,
-        outputEmptyOut      => outputEmptyOut,
-        outputAlmostEmptyOut=> outputAlmostEmptyOut,
-        outputValidOut      => valid_merger_out
+        rdenIn          => read_enable_to_merger,
+        dataOut         => dout_merger_out,
+        emptyOut        => emptyOut,
+        almostEmptyOut  => almostEmptyOut      ,
+        validOut        => valid_merger_out
       );
 
     u_OutThrottle: entity mylib.OutputThrottling
@@ -218,8 +220,8 @@ begin
         enDEBUG => false
       )
       port map(
-        rst     => sync_reset,
-        clk     => clk,
+        syncReset           => syncReset,
+        clk                 => clk,
 
         -- status input --
         intputThrottlingOn  => input_throttling_type2_on,
@@ -234,17 +236,10 @@ begin
         dIn                 => dout_merger_out,
 
         -- Data Out --
-        validOut            => outputValidOut,
-        dOut                => outputDoutOut
+        validOut            => validOut,
+        dOut                => dataOut
 
       );
   end generate;
-
-
-
-
-  -- Reset sequence --
-  u_reset_gen_sys   : entity mylib.ResetGen
-    port map(rst, clk, sync_reset);
 
 end Behavioral;
