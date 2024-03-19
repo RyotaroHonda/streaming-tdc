@@ -72,7 +72,7 @@ begin
   isWorking   <= throttling_is_working;
 
   -- Throttle status -------------------------------------------------------
-  u_state : process(syncReset, clk)
+  u_state : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then
@@ -90,7 +90,7 @@ begin
   end process;
 
   -- T2Start/End insertion request -----------------------------------------
-  u_request : process(clk, syncReset)
+  u_request : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then

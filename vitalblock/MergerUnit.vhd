@@ -193,7 +193,7 @@ begin
   progFullFifo    <= prog_full_outputfifo;
 
   --input fifo read
-  rden_inputfifo_process : process(syncReset,clk)
+  rden_inputfifo_process : process(clk)
     variable needread   : std_logic_vector(kNumInput-1 downto 0);
     variable rden       : std_logic_vector(kNumInput-1 downto 0);
     variable remainder  : std_logic_vector(kNumInput-1 downto 0);
@@ -254,7 +254,7 @@ begin
   end generate for_switch_input_to_output;
 
   --mask
-  mask_process : process(syncReset,clk)
+  mask_process : process(clk)
   begin
     if(clk'event and clk = '1')then
       if(syncReset = '1') then
@@ -288,7 +288,7 @@ begin
   end process;
 
   --output fifo
-  outputfifo_process : process(syncReset,clk)
+  outputfifo_process : process(clk)
   begin
     if(clk'event and clk = '1')then
       if(syncReset = '1') then

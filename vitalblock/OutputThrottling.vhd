@@ -57,7 +57,7 @@ begin
   isWorking   <= throttling_is_working;
 
   -- Throttle status -------------------------------------------------------
-  u_state : process(syncReset, clk)
+  u_state : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then
@@ -103,7 +103,7 @@ begin
     end if;
   end process;
 
-  u_mem : process(clk, syncReset)
+  u_mem : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then

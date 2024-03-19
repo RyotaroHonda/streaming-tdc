@@ -90,7 +90,7 @@ begin
   begin
 
     -- outputfifo
-    outputfifo_process : process(syncReset,clk)
+    outputfifo_process : process(clk)
     begin
       if(clk'event and clk = '1') then
         if(syncReset = '1') then

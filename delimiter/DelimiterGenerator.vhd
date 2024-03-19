@@ -59,7 +59,7 @@ begin
   dOutDelimiter       <= hb_delimiter;
 
   -- Generate heartbeat delimiter
-  u_delimiter_gen : process(syncReset, clk)
+  u_delimiter_gen : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then
@@ -81,7 +81,7 @@ begin
   end process;
 
   -- Flag record --
-  u_flag_recoard : process(syncReset, clk)
+  u_flag_recoard : process(clk)
   begin
     if(clk'event and clk = '1') then
       if(syncReset = '1') then
