@@ -337,7 +337,7 @@ begin
             din_outputfifo  <= din_merger;
         else                                -- not data
           wren_outputfifo <= '0';
-          din_outputfifo  <= (others=>'Z');
+          --din_outputfifo  <= (others=>'Z');
         end if;
       end if;
     end if;

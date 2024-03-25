@@ -15,7 +15,8 @@ package defDelimiter is
   constant kDataTypeIThrottleT2Start  : std_logic_vector (kWidthDataType-1 downto 0) := "011010"; -- Input Throttling Type2 Start timing
   constant kDataTypeIThrottleT2End    : std_logic_vector (kWidthDataType-1 downto 0) := "010010"; -- Input Throttling Type2 End timing
 
-  constant kDatatypeHeartbeat         : std_logic_vector (kWidthDataType-1 downto 0) := "011100"; -- heartbeat delimiter
+  constant kDatatypeHeartbeat         : std_logic_vector (kWidthDataType-1 downto 0) := "011100"; -- 1st heartbeat delimiter
+  constant kDatatypeHeartbeatT2       : std_logic_vector (kWidthDataType-1 downto 0) := "011110"; -- 2nd heartbeat delimiter
 
   --Delifiter flag definition ---------------------------------------------------------------
   constant kWidthDelimiterFlag    : integer  := 16;  -- Delimiter flag width
@@ -51,31 +52,25 @@ package defDelimiter is
   constant kLSBDataType     : integer  := kMSBDataType-kWidthDataType+1;
 
   -- Delimiter data --
-  -- 1st delimiter: 6-bit data-type, 2-bit reserve, 16-bit flag,    16-bit Time offset,         24-bit HBF number
-  -- 2nd delimiter: 6-bit data-type, 2-bit reserve, 16-bit reserve, 20-bit generated ddta size, 20-bit transferred data size
+  -- 1st delimiter: 6-bit data-type, 2-bit reserve, 16-bit flag,     16-bit Time offset,         24-bit HBF number
+  -- 2nd delimiter: 6-bit data-type, 2-bit reserve, 16-bit user reg, 20-bit generated ddta size, 20-bit transferred data size
 
   -- 1st delimiter --
   constant kPosHbdDataType  : std_logic_vector(kWidthData-1          downto kWidthData          -kWidthDataType)      := (others => '0');
-  constant kPosHbdReserve1  : std_logic_vector(kPosHbdDataType'low-1 downto kPosHbdDataType'low -2)                   :=(others => '0');
+  constant kPosHbdReserve1  : std_logic_vector(kPosHbdDataType'low-1 downto kPosHbdDataType'low -2)                   := (others => '0');
   constant kPosHbdFlag      : std_logic_vector(kPosHbdReserve1'low-1 downto kPosHbdReserve1'low -kWidthDelimiterFlag) := (others => '0');
   constant kPosHbdOffset    : std_logic_vector(kPosHbdFlag'low-1     downto kPosHbdFlag'low     -16)                  := (others => '0');
-  constant kPosHbdHBFrame   : std_logic_vector(kPosHbdOffset'low-1   downto kPosHbdOffset'low   -kWidthStrHbf)       := (others => '0');
+  constant kPosHbdHBFrame   : std_logic_vector(kPosHbdOffset'low-1   downto kPosHbdOffset'low   -kWidthStrHbf)        := (others => '0');
 
   -- 2nd delimiter --
-  constant kPosHbdReserve2  : std_logic_vector(kPosHbdReserve1'low-1 downto kPosHbdReserve1'low -16):= (others => '0');
-  constant kPosHbdGenSize   : std_logic_vector(kPosHbdReserve2'low-1 downto kPosHbdReserve2'low -20):= (others => '0');
+  constant kPosHbdUserReg   : std_logic_vector(kPosHbdReserve1'low-1 downto kPosHbdReserve1'low -16):= (others => '0');
+  constant kPosHbdGenSize   : std_logic_vector(kPosHbdUserReg'low-1 downto kPosHbdUserReg'low   -20):= (others => '0');
   constant kPosHbdTransSize : std_logic_vector(kPosHbdGenSize'low-1  downto kPosHbdGenSize'low  -20):= (others => '0');
 
   function checkDelimiter(data_type : std_logic_vector) return boolean;
   function checkTdc(data_type : std_logic_vector) return boolean;
 
-  -- Data array definition ------------------------------------------------------------------
-  --type dFineCountType is array (integer range kNumStrInput-1 downto 0) of std_logic_vector(kWidthFineCount-1 downto 0);
-  --type dTimingType    is array (integer range kNumStrInput-1 downto 0) of std_logic_vector(kWidthTiming-1 downto 0);
-  --type dTOTType       is array (integer range kNumStrInput-1 downto 0) of std_logic_vector(kWidthTOT-1 downto 0);
-  --type dDataType      is array (integer range kNumStrInput-1 downto 0) of std_logic_vector(kWidthData-1 downto 0);
-
-end package defDelimiter;
+  end package defDelimiter;
 -- ----------------------------------------------------------------------------------
 -- Package body
 -- ----------------------------------------------------------------------------------

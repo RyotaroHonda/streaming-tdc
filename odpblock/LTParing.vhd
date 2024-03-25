@@ -147,7 +147,7 @@ begin
               data_out(kPosHbdDataType'range) <= buf_leading(kPosHbdDataType'range);
               data_out(kPosChannel'range)     <= buf_leading(kPosChannel'range);
               data_out(kPosTot'range)         <= std_logic_vector(unsigned(dIn(kPosTot'length+kPosTiming'low-1 downto kPosTiming'low)) - unsigned(buf_leading(kPosTot'length+kPosTiming'low-1 downto kPosTiming'low)));
-              data_out(kPosTiming'range)      <= buf_leading(kPosTiming'range);
+              data_out(kPosTiming'high downto 0) <= (kPosTiming'range => buf_leading(kPosTiming'range), others => '0');
               valid_out                       <= '1';
 
               del_index                       := 0;

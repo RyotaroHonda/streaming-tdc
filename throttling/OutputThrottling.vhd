@@ -84,13 +84,19 @@ begin
 
       if(validIn = '1') then
         if(throttling_is_working = '1') then
-          dOut      <= dIn;
           if(checkDelimiter(data_type) = true) then
             -- Delimiter data --
             validOut                <= '1';
-            dOut(kPosHbdFlag'range) <= dIn(kPosHbdFlag'range) or genFlagVector(kIndexOutThrottling, mem_throttling);
+            dOut(kPosHbdDataType'range) <= dIn(kPosHbdDataType'range);
+            dOut(kPosHbdReserve1'range) <= dIn(kPosHbdReserve1'range);
+            dOut(kPosHbdFlag'range)     <= dIn(kPosHbdFlag'range) or genFlagVector(kIndexOutThrottling, mem_throttling);
+
+            dOut(kPosHbdOffset'range)   <= dIn(kPosHbdOffset'range);
+            dOut(kPosHbdHBFrame'range)  <= dIn(kPosHbdHBFrame'range);
+
           else
             -- TDC data --
+            dOut                    <= dIn;
             validOut                <= '0';
           end if;
         else

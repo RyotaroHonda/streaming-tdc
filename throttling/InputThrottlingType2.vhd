@@ -121,9 +121,13 @@ begin
     if(clk'event and clk = '1') then
       if(validIn = '1' and checkDelimiter(data_type) = true) then -- Delimiter is comming --
         -- Delimiter data --
-        dOut      <= dIn;
-        validOut  <= validIn;
-        dOut(kPosHbdFlag'range)  <= dIn(kPosHbdFlag'range) or genFlagVector(kIndexInThrottlingT2, mem_throttling);
+
+        validOut                    <= validIn;
+        dOut(kPosHbdDataType'range) <= dIn(kPosHbdDataType'range);
+        dOut(kPosHbdReserve1'range) <= dIn(kPosHbdReserve1'range);
+        dOut(kPosHbdFlag'range)     <= dIn(kPosHbdFlag'range) or genFlagVector(kIndexInThrottlingT2, mem_throttling);
+        dOut(kPosHbdOffset'range)   <= dIn(kPosHbdOffset'range);
+        dOut(kPosHbdHBFrame'range)  <= dIn(kPosHbdHBFrame'range);
 
         if(throttling_is_working = '0') then
           mem_throttling  <= '0';
@@ -141,7 +145,8 @@ begin
             dOut(kPosHbdDataType'range)   <= kDataTypeIThrottleT2Start;
             dOut(kPosChannel'range)       <= std_logic_vector(to_unsigned(kChannel, kPosChannel'length));
             dOut(kPosTot'range)           <= (others => '0');
-            dOut(kPosTiming'range)        <= hbCount & std_logic_vector(to_unsigned(0, kWidthFineCount));
+            --dOut(kPosTiming'range)        <= hbCount & std_logic_vector(to_unsigned(0, kWidthFineCount));
+            dOut(kPosTiming'high downto 0) <= (kPosTiming'high downto kPosTiming'high-kWidthStrHbc+1 => hbCount, others => '0');
 
             t2start_insert_ack  <= '1';
             t2end_insert_ack    <= '0';
@@ -150,7 +155,8 @@ begin
             dOut(kPosHbdDataType'range)   <= kDataTypeIThrottleT2End;
             dOut(kPosChannel'range)       <= std_logic_vector(to_unsigned(kChannel, kPosChannel'length));
             dOut(kPosTot'range)           <= (others => '0');
-            dOut(kPosTiming'range)        <= hbCount & std_logic_vector(to_unsigned(0, kWidthFineCount));
+            --dOut(kPosTiming'range)        <= hbCount & std_logic_vector(to_unsigned(0, kWidthFineCount));
+            dOut(kPosTiming'high downto 0) <= (kPosTiming'high downto kPosTiming'high-kWidthStrHbc+1 => hbCount, others => '0');
 
             t2start_insert_ack  <= '0';
             t2end_insert_ack    <= '1';

@@ -57,6 +57,7 @@ architecture RTL of TDCDelayBuffer is
     addra : IN  STD_LOGIC_VECTOR(kWidthAddrBuffer-1 DOWNTO 0);
     dina  : IN  STD_LOGIC_VECTOR(kWidthDataBuffer-1 DOWNTO 0);
     clkb  : IN  STD_LOGIC;
+    enb   : IN STD_LOGIC;
     addrb : IN  STD_LOGIC_VECTOR(kWidthAddrBuffer-1 DOWNTO 0);
     doutb : OUT STD_LOGIC_VECTOR(kWidthDataBuffer-1 DOWNTO 0)
   );
@@ -114,6 +115,7 @@ begin
     addra => waddr,
     dina  => wdata,
     clkb  => clk,
+    enb   => '1',
     addrb => raddr,
     doutb => rdata
   );

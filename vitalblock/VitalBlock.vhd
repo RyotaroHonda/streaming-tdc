@@ -14,7 +14,7 @@ entity VitalBlock is
     enDEBUG             : boolean := false
   );
   port (
-    syncReset           : in STD_LOGIC;  -- User reset (synchronous)
+    rst                 : in STD_LOGIC;  -- User reset (synchronous)
     clk                 : in STD_LOGIC;
     lhbfNumMismatch     : out std_logic; -- Local heartbeat frame num mismatch
 
@@ -23,12 +23,12 @@ entity VitalBlock is
     odpDataIn           : in  DataArrayType(kNumInput-1 downto 0);
     hbCount             : in  std_logic_vector(kWidthHBCount-1 downto 0);
 
-    -- Stcp flag --
-    bufferProgFull      : out std_logic;                                  -- Incomming buffer prog full flag
+    -- Status output --
+    bufferProgFull      : out std_logic;                              -- Incomming buffer prog full flag
 
     -- Throttling status --
-    outThrottlingOn     : out std_logic;                                  -- Output throttling status
-    inThrottlingT2On    : out std_logic;                                  -- Input throttling Type2 status
+    outThrottlingOn     : out std_logic;                              -- Output throttling status
+    inThrottlingT2On    : out std_logic;                              -- Input throttling Type2 status
 
     -- Link buf status --
     pfullLinkBufIn      : in std_logic;
@@ -46,6 +46,8 @@ end VitalBlock;
 architecture Behavioral of VitalBlock is
 
   -- System --
+  signal sync_reset             : std_logic;
+
   signal incoming_buf_pfull     : std_logic_vector(kNumInput-1 downto 0);
   signal input_throttling_type2_on : std_logic;
   signal output_throttling_on   : std_logic;
@@ -103,7 +105,7 @@ begin
         enDEBUG   => false
       )
       port map(
-        syncReset           => syncReset,
+        syncReset           => sync_reset,
         clk                 => clk,
 
         -- status input --
@@ -140,7 +142,7 @@ begin
     )
     port map(
       clk             => clk,
-      syncReset       => syncReset,
+      syncReset       => sync_reset,
 
       odpWrenIn       => odpWrenIn,
       odpDataIn       => odpDataIn,
@@ -171,7 +173,7 @@ begin
       )
       port map(
         clk           => clk,
-        syncReset     => syncReset,
+        syncReset     => sync_reset,
 
         rdenOut       => rden_incoming,
         dataIn        => dout_incoming,
@@ -199,7 +201,7 @@ begin
       )
       port map(
         clk             => clk,
-        syncReset       => syncReset,
+        syncReset       => sync_reset,
         hbfNumMismatch  => local_hbf_num_mismatch,
 
         rdenOut         => rden_incoming,
@@ -220,7 +222,7 @@ begin
         enDEBUG => false
       )
       port map(
-        syncReset           => syncReset,
+        syncReset           => sync_reset,
         clk                 => clk,
 
         -- status input --
@@ -241,5 +243,9 @@ begin
 
       );
   end generate;
+
+  -- Reset sequence --
+  u_reset_gen_sys   : entity mylib.ResetGen
+    port map(rst, clk, sync_reset);
 
 end Behavioral;
