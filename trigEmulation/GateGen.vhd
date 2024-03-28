@@ -1,5 +1,6 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_MISC.ALL;
 use ieee.numeric_std.all;
 
 library mylib;
@@ -9,7 +10,7 @@ entity GateGen is
   port(
     clk             : in STD_LOGIC;
 
-    emuModeOn       : in std_logic;
+    emuModeOn       : in std_logic_vector(1 downto 0);
     delayReg        : in std_logic_vector(kWidthTrgDelay-1 downto 0);
     widthReg        : in std_logic_vector(kWidthTrgWidth-1 downto 0);
 
@@ -24,6 +25,7 @@ architecture Behavioral of GateGen is
   -- System --
   signal one_shot_trig    : std_logic;
   signal mode_on_edge     : std_logic;
+  signal gate_out         : std_logic;
 
   constant kMaxAddr       : unsigned(kWidthTrgDelay-1 downto 0):= (others => '1');
   signal write_addr, read_addr  : std_logic_vector(kWidthTrgDelay-1 downto 0):= (others => '0');
@@ -36,8 +38,10 @@ begin
   --                              Body
   -- =======================================================================
 
+  gateOut <= not gate_out when(emuModeOn = kVetoMode) else gate_out;
+
   u_edge_trig   : entity mylib.EdgeDetector port map(clk, triggerIn, one_shot_trig);
-  u_edge_modeon : entity mylib.EdgeDetector port map(clk, emuModeOn, mode_on_edge);
+  u_edge_modeon : entity mylib.EdgeDetector port map(clk, or_reduce(emuModeOn), mode_on_edge);
 
   u_addr : process(clk)
   begin
@@ -79,12 +83,12 @@ begin
         end if;
       end if;
 
-      if(emuModeOn = '0') then
-        gateOut <= '1';
-      elsif(emuModeOn = '1' and unsigned(gate_count) /= 0) then
-        gateOut <= '1';
+      if(emuModeOn = "00") then
+        gate_out <= '1';
+      elsif(or_reduce(emuModeOn) = '1' and unsigned(gate_count) /= 0) then
+        gate_out <= '1';
       else
-        gateOut <= '0';
+        gate_out <= '0';
       end if;
     end if;
   end process;

@@ -314,6 +314,7 @@ begin
               hbfnum_mismatch  <= check_hbfnum_mismatch(din_merger(kPosHbdHBFrame'range), reg_hbfnum) or hbfnum_mismatch;
             else
               -- 2nd delimiter --
+              hbfnum_mismatch       <= '0';
               hbfnum_is_registered  <= '0';
             end if;
           else                                                                        --- no last delimiter
